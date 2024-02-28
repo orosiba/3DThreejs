@@ -10,19 +10,30 @@
 
 // Modulos necesarios
 import * as THREE from "../lib/three.module.js";
+import {OrbitControls} from "../lib/OrbitControls.module.js";
+import {GLTFLoader} from "../lib/GLTFLoader.module.js";
 
-//Variables globales
+// --VARIABLES GLOBALES--
+// Camara escena y render
 let camera, scene, renderer;
-let bola, objetos;
-let score = 0;
-let time = 30;
-let keys = {}
+let controls;
 
-// Acciones
+// Variables de movimiento
+let mouseX = 0, mouseY = 0;
+let previousMouseX = 0, previousMouseY = 0;
+let ballVelocity = new THREE.Vector3();
+
+// Objetos
+let robot, objetos;
+let keys = {};
+
+// --ACCIONES--
 init();
 loadScene();
-render();
+setTimeout(() => { render(); }, 500);
 
+// --FUNCIONES--
+// Inicializar el entorno
 function init()
 {
     // Motor de render
@@ -32,47 +43,93 @@ function init()
 
     // Crear la escena
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0.5,0.5,0.5);
+    const backloader = new THREE.CubeTextureLoader();
+    const fondo = backloader.load([
+        'images/SkyBox/posx.bmp', // Derecha
+        'images/SkyBox/negx.bmp', // Izquierda
+        'images/SkyBox/posy.bmp', // Arriba
+        'images/SkyBox/negy.bmp', // Abajo
+        'images/SkyBox/posz.bmp', // Frente
+        'images/SkyBox/negz.bmp'  // Atrás
+    ]);
+    scene.background = fondo;
 
     // Crear la cámara
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.set(15,15,0);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0,0.25,-1.5);
 
-    //Luces
-    var light = new THREE.DirectionalLight(0x000000, 1);
+    // Luces
+    const light = new THREE.DirectionalLight(0xffffff, 5);
+    light.position.set(10, 10, 0);
     scene.add(light);
 
-    // Manejador de eventos para las teclas presionadas
-    window.addEventListener('keydown', e => {
-        keys[e.key] = true;
+    // Eventos
+    // Ecento de tecla pulsada
+    document.addEventListener('keydown', (event) => {
+        keys[event.key] = true;
     });
-    window.addEventListener('keyup', e => {
-        keys[e.key] = false;
+    // Evento de tecla soltada
+    document.addEventListener('keyup', (event) => {
+        keys[event.key] = false;
+    });
+    // Evento de ratón movido
+    document.addEventListener('mousemove', (event) => {
+        mouseX = event.clientX;
+        mouseY = event.clientY;
     });
 }
 
+//Cargar objetos de la escena
 function loadScene()
 {
+    //Definir texture loader
+    var textureLoader = new THREE.TextureLoader();
 
     // Suelo
-    const materialSuelo = new THREE.MeshBasicMaterial({color:'yellow',wireframe:true});
-    const geometriaSuelo = new THREE.BoxGeometry (20,1,20);
-    const suelo = new THREE.Mesh( geometriaSuelo, materialSuelo );
+    var texture = textureLoader.load('images/grass.png');
+    // Set tiling properties
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(10, 10);
+    const materialSuelo = new THREE.MeshBasicMaterial({ map: texture });
+    const geometriaSuelo = new THREE.BoxGeometry (50,1,50);
+    const suelo = new THREE.Mesh( geometriaSuelo, materialSuelo);
+    suelo.rotation.y = Math.PI/2
+    suelo.position.y = -0.75
     scene.add(suelo);
 
-    //Muros
+    // Muros
+    let rotation = 0;
+    let posiciones = [[0,4.5,25],[25,4.5,0],[0,4.5,-25],[-25,4.5,0]]
+    var texture = textureLoader.load('images/wall.png');
+    // Propiedades de repetición de textura
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(50, 20);
+    const geometriaMuro = new THREE.BoxGeometry(50, 10, 1);
+    const materialMuro = new THREE.MeshBasicMaterial({ map: texture });
     for(let i=0; i<4; i++){
-
+        const muro = new THREE.Mesh(geometriaMuro, materialMuro);
+        muro.position.set(posiciones[i][0],posiciones[i][1],posiciones[i][2])
+        muro.rotation.y = rotation
+        scene.add(muro)
+        rotation += Math.PI/2
     }
 
-    // Crear la bola del jugador
-    // Load texture
-    var textureLoader = new THREE.TextureLoader();
-    var texture = textureLoader.load('path/to/texture.jpg');
-    const geometriaBola = new THREE.SphereGeometry(0.5, 32, 32);
-    const materialBola = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-    bola = new THREE.Mesh(geometriaBola, materialBola);
-    scene.add(bola);
+    // Personaje principal modelo gltf robot
+    var loader = new GLTFLoader();
+    loader.load('models/Soldier/soldier.glb', function (gltf) {
+        robot = gltf.scene;
+        robot.scale.set(0.25, 0.25, 0.25);
+        robot.position.y = -0.25;
+
+        scene.add(robot);
+        // Animaciones
+        const animacion = gltf.animations[0];
+        const mixer = new THREE.AnimationMixer(robot);
+        const action = mixer.clipAction(animacion);
+        action.play();
+    });
 
     // Crear objetos para recolectar
     objetos = new THREE.Object3D();
@@ -86,30 +143,46 @@ function loadScene()
     }
 }
 
-function update()
+function animate()
 {
-    // Actualizar la posición de la bola según las teclas presionadas
-    const speed = 0.1;
-    if (keys['w']) bola.position.x -= speed;
-    if (keys['a']) bola.position.z += speed;
-    if (keys['s']) bola.position.x += speed;
-    if (keys['d']) bola.position.z -= speed;
+    // Movimiento de la cámara para seguir al personaje
+    camera.position.x = robot.position.x;
+    camera.position.z = robot.position.z + 1;
 
-    // Verificar colisiones entre la bola y los objetos
-    objetos.children.forEach(objeto => {
-        if (bola.position.distanceTo(objeto.position) < 1) {
-            objetos.remove(objeto);
-            score++;
-        }
-    });
+    // Movimiento de la camara en los tres ejes con el raton siguiendo al personaje
+    let deltaX = mouseX - previousMouseX;
+    let deltaY = mouseY - previousMouseY;
+    robot.rotation.y -= deltaX * 0.01;
+    camera.position.x = robot.position.x + Math.sin(robot.rotation.y) * 1;
+    camera.position.z = robot.position.z + Math.cos(robot.rotation.y) * 1;
+    //camera.position.y = robot.position.y + Math.sin(deltaY * 0.01) * 1
+    camera.lookAt(robot.position);
+    previousMouseX = mouseX;
+    previousMouseY = mouseY;
 
-    // Actualizar la cámara
-    camera.lookAt(bola.position);
+    // Movimiento del personaje con las teclas
+    if (keys['w']) {
+        robot.position.x -= Math.sin(robot.rotation.y) * 0.1;
+        robot.position.z -= Math.cos(robot.rotation.y) * 0.1;
+    }
+    if (keys['s']) {
+        robot.position.x += Math.sin(robot.rotation.y) * 0.1;
+        robot.position.z += Math.cos(robot.rotation.y) * 0.1;
+    }
+    if (keys['a']) {
+        robot.position.x += Math.sin(robot.rotation.y - Math.PI / 2) * 0.1;
+        robot.position.z += Math.cos(robot.rotation.y - Math.PI / 2) * 0.1;
+    }
+    if (keys['d']) {
+        robot.position.x += Math.sin(robot.rotation.y + Math.PI / 2) * 0.1;
+        robot.position.z += Math.cos(robot.rotation.y + Math.PI / 2) * 0.1;
+    }
+
 }
 
 function render()
 {
     requestAnimationFrame( render );
-    update();
+    animate();
     renderer.render( scene, camera );
 }
