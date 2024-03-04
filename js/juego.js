@@ -1,12 +1,6 @@
-/**
- * Escena.js
- * 
- * Seminario AGM #1. Escena basica en three.js: 
- * Transformaciones, animacion basica y modelos importados
- * 
- * @author <rvivo@upv.es>, 2023
- * 
- */
+// Autor: Oscar Rosello Ibañez
+// Versión: 1.0
+// Descripción: Código de un juego en 3D con three.js
 
 // Modulos necesarios
 import * as THREE from "../lib/three.module.js";
@@ -16,16 +10,19 @@ import {GLTFLoader} from "../lib/GLTFLoader.module.js";
 // --VARIABLES GLOBALES--
 // Camara escena y render
 let camera, scene, renderer;
-let controls;
 
 // Variables de movimiento
 let mouseX = 0, mouseY = 0;
 let previousMouseX = 0, previousMouseY = 0;
-let ballVelocity = new THREE.Vector3();
 
 // Objetos
 let robot, objetos;
+
+//Teclas
 let keys = {};
+
+// Animaciones
+let clock, mixer, idleAnimation, walkAnimation, runAnimation;
 
 // --ACCIONES--
 init();
@@ -40,6 +37,9 @@ function init()
     renderer = new THREE.WebGLRenderer();
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.getElementById('container').appendChild( renderer.domElement );
+
+    // Reloj
+    clock = new THREE.Clock();
 
     // Crear la escena
     scene = new THREE.Scene();
@@ -58,24 +58,31 @@ function init()
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0,0.25,-1.5);
 
-    // Luces
-    const light = new THREE.DirectionalLight(0xffffff, 5);
-    light.position.set(10, 10, 0);
-    scene.add(light);
-
     // Eventos
     // Ecento de tecla pulsada
     document.addEventListener('keydown', (event) => {
-        keys[event.key] = true;
+        if (event.key == 'Shift') {
+            keys['Shift'] = !keys['Shift'];
+        }else{
+            keys[event.key] = true;
+        }
     });
     // Evento de tecla soltada
     document.addEventListener('keyup', (event) => {
-        keys[event.key] = false;
+        if (event.key in keys && event.key != "Shift"){
+            keys[event.key] = false;
+        }
     });
     // Evento de ratón movido
     document.addEventListener('mousemove', (event) => {
         mouseX = event.clientX;
         mouseY = event.clientY;
+    });
+    // Evento de redimensionar la ventana
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
 }
 
@@ -100,13 +107,13 @@ function loadScene()
 
     // Muros
     let rotation = 0;
-    let posiciones = [[0,4.5,25],[25,4.5,0],[0,4.5,-25],[-25,4.5,0]]
+    let posiciones = [[0,2,25],[25,2,0],[0,2,-25],[-25,2,0]]
     var texture = textureLoader.load('images/wall.png');
     // Propiedades de repetición de textura
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(50, 20);
-    const geometriaMuro = new THREE.BoxGeometry(50, 10, 1);
+    const geometriaMuro = new THREE.BoxGeometry(50, 5, 1);
     const materialMuro = new THREE.MeshBasicMaterial({ map: texture });
     for(let i=0; i<4; i++){
         const muro = new THREE.Mesh(geometriaMuro, materialMuro);
@@ -123,28 +130,61 @@ function loadScene()
         robot.scale.set(0.25, 0.25, 0.25);
         robot.position.y = -0.25;
 
-        scene.add(robot);
         // Animaciones
-        const animacion = gltf.animations[0];
-        const mixer = new THREE.AnimationMixer(robot);
-        const action = mixer.clipAction(animacion);
-        action.play();
+        const animations = gltf.animations;
+
+        mixer = new THREE.AnimationMixer(robot);
+
+        idleAnimation = mixer.clipAction(animations[0]);
+        walkAnimation = mixer.clipAction(animations[3]);
+        runAnimation = mixer.clipAction(animations[1]);
+        
+        idleAnimation.play();
+        idleAnimation.setEffectiveWeight(1);
+        walkAnimation.play();
+        walkAnimation.setEffectiveWeight(0);
+        runAnimation.play();
+        runAnimation.setEffectiveWeight(0);
+
+        scene.add(robot);
     });
 
     // Crear objetos para recolectar
     objetos = new THREE.Object3D();
     scene.add(objetos);
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
+        const geometriaManiqui = new THREE.BoxGeometry(1, 2, 0.5);
+        const materialManiqui = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const maniqui = new THREE.Mesh(geometriaManiqui, materialManiqui);
+        maniqui.position.set(Math.random() * 50 - 10, 0, Math.random() * 50 - 10);
+        objetos.add(maniqui);
         const geometriaObjeto = new THREE.BoxGeometry(0.5, 0.5, 0.5);
         const materialObjeto = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const objeto = new THREE.Mesh(geometriaObjeto, materialObjeto);
-        objeto.position.set(Math.random() * 20 - 10, 0, Math.random() * 20 - 10);
+        objeto.position.set(Math.random() * 50 - 10, 0, Math.random() * 50 - 10);
         objetos.add(objeto);
     }
+
+    // Creación del sol
+    const sol = new THREE.Mesh( new THREE.SphereGeometry(5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+    sol.position.set(0, 20, 0);
+    scene.add(sol);
+    // Creación de la luz
+    const luz = new THREE.PointLight(0xffffff, 1);
+    luz.position.set(0, 20, 0);
+    scene.add(luz);
+    // Creación de la luz ambiental
+    const luzAmbiente = new THREE.AmbientLight(0x404040);
+    scene.add(luzAmbiente);
 }
 
 function animate()
 {
+
+    let mixerUpdateDelta = clock.getDelta();
+
+    mixer.update( mixerUpdateDelta );
+
     // Movimiento de la cámara para seguir al personaje
     camera.position.x = robot.position.x;
     camera.position.z = robot.position.z + 1;
@@ -155,29 +195,45 @@ function animate()
     robot.rotation.y -= deltaX * 0.01;
     camera.position.x = robot.position.x + Math.sin(robot.rotation.y) * 1;
     camera.position.z = robot.position.z + Math.cos(robot.rotation.y) * 1;
-    //camera.position.y = robot.position.y + Math.sin(deltaY * 0.01) * 1
+    //camera.position.y = robot.position.y + deltaY * 0.01;
     camera.lookAt(robot.position);
     previousMouseX = mouseX;
     previousMouseY = mouseY;
 
-    // Movimiento del personaje con las teclas
-    if (keys['w']) {
-        robot.position.x -= Math.sin(robot.rotation.y) * 0.1;
-        robot.position.z -= Math.cos(robot.rotation.y) * 0.1;
-    }
-    if (keys['s']) {
-        robot.position.x += Math.sin(robot.rotation.y) * 0.1;
-        robot.position.z += Math.cos(robot.rotation.y) * 0.1;
-    }
-    if (keys['a']) {
-        robot.position.x += Math.sin(robot.rotation.y - Math.PI / 2) * 0.1;
-        robot.position.z += Math.cos(robot.rotation.y - Math.PI / 2) * 0.1;
-    }
-    if (keys['d']) {
-        robot.position.x += Math.sin(robot.rotation.y + Math.PI / 2) * 0.1;
-        robot.position.z += Math.cos(robot.rotation.y + Math.PI / 2) * 0.1;
+    // Animaciones y movimiento del personaje
+    let speed;
+
+    // Si se pulsa shift, el personaje corre
+    if (keys['Shift']) {
+        // Activa la animacion de run
+        walkAnimation.setEffectiveWeight(0);
+        runAnimation.setEffectiveWeight(1);
+        idleAnimation.setEffectiveWeight(0);
+        speed = 0.1;
+    } else {
+        // Activa la animacion de walk
+        walkAnimation.setEffectiveWeight(1);
+        runAnimation.setEffectiveWeight(0);
+        idleAnimation.setEffectiveWeight(0);
+        speed = 0.05;
     }
 
+    // Movimiento del personaje con las teclas
+    if (keys['w']) {
+        // Movimiento del personaje
+        robot.position.x -= Math.sin(robot.rotation.y) * speed;
+        robot.position.z -= Math.cos(robot.rotation.y) * speed;
+    } else if (keys['s']) {
+        // Movimiento del personaje
+        robot.position.x += Math.sin(robot.rotation.y) * speed;
+        robot.position.z += Math.cos(robot.rotation.y) * speed;
+    } else {
+        // Activa la animacion de idle
+        walkAnimation.setEffectiveWeight(0);
+        runAnimation.setEffectiveWeight(0);
+        idleAnimation.setEffectiveWeight(1);
+        speed = 0;
+    }
 }
 
 function render()
