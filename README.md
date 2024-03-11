@@ -10,7 +10,7 @@ Este proyecto es un diseño sobre un videojuego web usando Three.js para la asig
 
 ### Generación del terreno
 
-El terreno esta conformado por un suelo con textura de hierba y cuatro muros que delimitan el mapa y los diferentes elementos que lo conforman.
+El terreno esta conformado por un suelo con textura de hierba, cuatro muros que delimitan el mapa y los diferentes elementos que lo conforman.
 
 ### Objetos (Tornillos y tuercas)
 
@@ -34,8 +34,7 @@ Pulsar shift alterna entre correr y andar
 
 ## Referencias
 
-grass https://opengameart.org/content/grass-1
-skybox https://opengameart.org/content/sky-box-sunny-day
-
-Robot model https://poly.pizza/m/QCm7qe9uNJ
-Enemy model https://poly.pizza/m/lF3jeRJwiH
+* grass https://opengameart.org/content/grass-1
+* skybox https://opengameart.org/content/sky-box-sunny-day
+* Robot model https://poly.pizza/m/QCm7qe9uNJ
+* Enemy model https://poly.pizza/m/lF3jeRJwiH
