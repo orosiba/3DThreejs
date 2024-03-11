@@ -26,7 +26,7 @@ let robot, objetos, enemigos, muros;
 let keys = {};
 
 // Animaciones
-let acciones = {};
+let accionesRobot = {};
 let clock, mixer, accionActiva, accionPrevia;
 
 // Puntuacion y estado
@@ -40,11 +40,12 @@ createGUI();
 setTimeout(() => { render(); }, 500);
 
 // --FUNCIONES--
-//Realizar un fade entre dos animaciones
+
+// Realizar un fade entre dos animaciones
 function fadeToAction( accion, duracion ) {
 
     accionPrevia = accionActiva;
-    accionActiva = acciones[ accion ];
+    accionActiva = accionesRobot[ accion ];
 
     if ( accionPrevia !== accionActiva ) {
 
@@ -59,18 +60,33 @@ function fadeToAction( accion, duracion ) {
 
 }
 
+// Funcion para la animación de los objetos
+function objectBalance(){
+    // Animacion de balanceo de los objetos
+    objetos.children.forEach(objeto => {
+        new TWEEN.Tween(objeto.position)
+        .to({ y: [-0.05,-0.1] }, 2000)
+        .easing(TWEEN.Easing.Linear.None)
+        .repeat(Infinity)
+        .start();
+        // Animacion de rotacion de los objetos
+        new TWEEN.Tween(objeto.rotation)
+        .to({ y: Math.PI * 2 }, 2500)
+        .easing(TWEEN.Easing.Linear.None)
+        .repeat(Infinity)
+        .start();
+    });
+}
+
 // Metodo de geometria de un tornillo
 function tornillo() {
-    var geometry = new THREE.CylinderGeometry( 0.1, 0.1, 0.5, 32 );
-    var material = new THREE.MeshBasicMaterial( {color: 0xffff00} );
-    var cylinder = new THREE.Mesh( geometry, material );
-    return cylinder;
+    
 }
 
 // Metodo de la geometria de una tuerca
 function tuerca() {
-    var geometry = new THREE.TorusGeometry( 0.05, 0.015, 5, 6 );
-    var material = new THREE.MeshPhongMaterial( { color: 0x808080 } );
+    var geometry = new THREE.TorusGeometry( 0.05, 0.0175, 3, 7 );
+    var material = new THREE.MeshLambertMaterial( { color: 0x808080 } );
     var torus = new THREE.Mesh( geometry, material );
     return torus;
 }
@@ -143,7 +159,7 @@ function loadScene()
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(10, 10);
-    const materialSuelo = new THREE.MeshPhongMaterial({ map: texture });
+    const materialSuelo = new THREE.MeshLambertMaterial({ map: texture });
     const geometriaSuelo = new THREE.BoxGeometry (40,1,40);
     const suelo = new THREE.Mesh( geometriaSuelo, materialSuelo);
     suelo.rotation.y = Math.PI/2
@@ -156,7 +172,7 @@ function loadScene()
     let posiciones = [[0,2,20],[20,2,0],[0,2,-20],[-20,2,0]]
     var texture = textureLoader.load('images/wall.png');
     const geometriaMuro = new THREE.BoxGeometry(40, 5, 1);
-    const materialMuro = new THREE.MeshPhongMaterial({ map: texture });
+    const materialMuro = new THREE.MeshLambertMaterial({ map: texture });
     // Propiedades de repetición de textura
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
@@ -173,7 +189,7 @@ function loadScene()
 
     // Personaje principal modelo gltf robot
     var loader = new GLTFLoader();
-    loader.load('models/Soldier/soldier.glb', function (gltf) {
+    loader.load('models/Robot/Robot.glb', function (gltf) {
         robot = gltf.scene;
         robot.scale.set(0.05, 0.05, 0.05);
         robot.position.y = -0.25;
@@ -183,17 +199,17 @@ function loadScene()
 
         mixer = new THREE.AnimationMixer(robot);
 
-        acciones['idleAnimation'] = mixer.clipAction(animations[2]);
-        acciones['walkAnimation'] = mixer.clipAction(animations[10]);
-        acciones['runAnimation'] = mixer.clipAction(animations[6]);
-        acciones['deathAnimation'] = mixer.clipAction(animations[1]);
+        accionesRobot['idleAnimation'] = mixer.clipAction(animations[2]);
+        accionesRobot['walkAnimation'] = mixer.clipAction(animations[10]);
+        accionesRobot['runAnimation'] = mixer.clipAction(animations[6]);
+        accionesRobot['deathAnimation'] = mixer.clipAction(animations[1]);
         
         // Activar las animacciones y establecer pesos
         
-        acciones['idleAnimation'].setEffectiveWeight(1).play();
-        accionActiva = acciones['idleAnimation'];
-        acciones['deathAnimation'].setLoop(THREE.LoopOnce);
-        acciones['deathAnimation'].clampWhenFinished = true;
+        accionesRobot['idleAnimation'].setEffectiveWeight(1).play();
+        accionActiva = accionesRobot['idleAnimation'];
+        accionesRobot['deathAnimation'].setLoop(THREE.LoopOnce);
+        accionesRobot['deathAnimation'].clampWhenFinished = true;
 
         scene.add(robot);
 
@@ -204,20 +220,23 @@ function loadScene()
     scene.add(objetos);
     for (let i = 0; i < 50; i++) {
         const objeto = tuerca();
-        objeto.position.set(Math.random() * 40 - 5, -0.1, Math.random() * 40 - 5);
+        objeto.position.set(Math.random() * 30 - 15, -0.1, Math.random() * 30 - 15);
         objetos.add(objeto);
     }
 
-    // Enemigos
-    enemigos = new THREE.Object3D();
-    scene.add(enemigos);
-    for (let i = 0; i < 10; i++) {
-        const geometriaEnemigo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const materialEnemigo = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-        const enemigo = new THREE.Mesh(geometriaEnemigo, materialEnemigo);
-        enemigo.position.set(Math.random() * 30 - 15, 0, Math.random() * 30 - 15);
-        enemigos.add(enemigo);
-    }
+    objectBalance();
+
+    // // Añadir 5 enemigos usando el modelo gltf Enemy y animarlos
+    // enemigos = new THREE.Object3D();
+    // scene.add(enemigos);
+    // for (let i = 0; i < 5; i++) {
+    //     loader.load('models/Enemy/Enemy.glb', function (gltf) {
+    //         let enemigo = gltf.scene;
+    //         enemigo.scale.set(0.25, 0.25, 0.25);
+    //         enemigo.position.set(Math.random() * 30 - 15, 0, Math.random() * 30 - 15);
+    //         enemigos.add(enemigo);
+    //     });
+    // }
 
     // Creación del sol
     const sol = new THREE.Mesh( new THREE.SphereGeometry(5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
@@ -228,9 +247,6 @@ function loadScene()
     sunlight.position.set(0, 25, 70);
     sunlight.target = suelo;
     scene.add(sunlight);
-    // Helper de luz direccional
-    var helper = new THREE.SpotLightHelper(sunlight, 5);
-    scene.add(helper);
     // Luz ambiental
     var ambientLight = new THREE.AmbientLight(0x404040, 3); // Soft white light
     scene.add(ambientLight);
@@ -251,8 +267,14 @@ function createGUI()
 function animate()
 {
 
-    // Actualizar Tween
+    // --ACTUALIZACIONES--
+
+    // Actualizar el reloj
+    let UpdateDelta = clock.getDelta();
+
+    // Actualizar Tween y mixer
     TWEEN.update();
+    mixer.update( UpdateDelta );
 
     // Actualizar interfaz
     const puntuacionGUI = { puntuacion: puntuacion };
@@ -261,24 +283,7 @@ function animate()
     stats.add(puntuacionGUI, 'puntuacion').listen().name('Puntuacion');
     stats.open();
 
-    // Balanceo de los objetos usando Tween
-    objetos.children.forEach(objeto => {
-    
-    objeto.rotation.y += 0.1;
-    const tween = new TWEEN.Tween(objeto.position)
-        .to({ y: 0.5 }, 1000)
-        .easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(() => {
-            objeto.position.y = -0.1;
-        })
-        .yoyo(true)
-        .repeat(Infinity)
-        .start();
-    });
-
-    let UpdateDelta = clock.getDelta();
-
-    mixer.update( UpdateDelta );
+    // -- ANIMACIONES Y MOVIMIENTOS --
 
     // Movimiento de la camara en los tres ejes con el raton siguiendo al personaje
     let deltaX = mouseX - previousMouseX;
@@ -307,24 +312,48 @@ function animate()
     // Movimiento del personaje con las teclas independiente de los fps
     if (keys['w'] && !muerto) {
         // Movimiento del personaje
-        robot.position.x += Math.sin(robot.rotation.y) * speed * UpdateDelta;
-        robot.position.z += Math.cos(robot.rotation.y) * speed * UpdateDelta;
+        if (robot.position.x >= 19.3) {
+            robot.position.x -= 0.1;
+        } else if (robot.position.x <= -19.3) {
+            robot.position.x += 0.1;
+        } else if (robot.position.z >= 19.3) {
+            robot.position.z -= 0.1;
+        } else if (robot.position.z <= -19.3) {
+            robot.position.z += 0.1;
+        }else{
+            robot.position.x += Math.sin(robot.rotation.y) * speed * UpdateDelta;
+            robot.position.z += Math.cos(robot.rotation.y) * speed * UpdateDelta;
+        }
     } else if (keys['s'] && !muerto) {
         // Movimiento del personaje
-        robot.position.x -= Math.sin(robot.rotation.y) * speed * UpdateDelta;
-        robot.position.z -= Math.cos(robot.rotation.y) * speed * UpdateDelta;
+        if (robot.position.x >= 19.3) {
+            robot.position.x -= 0.1;
+        } else if (robot.position.x <= -19.3) {
+            robot.position.x += 0.1;
+        } else if (robot.position.z >= 19.3) {
+            robot.position.z -= 0.1;
+        } else if (robot.position.z <= -19.3) {
+            robot.position.z += 0.1;
+        }else{
+            robot.position.x -= Math.sin(robot.rotation.y) * speed * UpdateDelta;
+            robot.position.z -= Math.cos(robot.rotation.y) * speed * UpdateDelta;
+        }
     } else if (!muerto) {
         // Activa la animacion de idle
         fadeToAction('idleAnimation', 0.25);
         speed = 0;
     }
 
-    // Movimiento de los enemigos
-    enemigos.children.forEach(enemigo => {
-        enemigo.lookAt(robot.position);
-        enemigo.position.x += Math.sin(enemigo.rotation.y) * 0.025;
-        enemigo.position.z += Math.cos(enemigo.rotation.y) * 0.025;
-    });
+    // // Movimiento de los enemigos buscando al personaje
+    // enemigos.children.forEach(enemigo => {
+    //     let direccion = new THREE.Vector3();
+    //     direccion.subVectors(robot.position, enemigo.position).normalize();
+    //     enemigo.lookAt(robot.position);
+    //     enemigo.position.x += direccion.x * 0.5 * UpdateDelta;
+    //     enemigo.position.z += direccion.z * 0.5 * UpdateDelta;
+    // });
+
+    // --COLISIONES--
 
     // Colisiones con los objetos
     objetos.children.forEach(objeto => {
@@ -335,20 +364,20 @@ function animate()
         }
     });
 
-    // Colisiones con los enemigos
-    enemigos.children.forEach(enemigo => {
-        if (robot.position.distanceTo(enemigo.position) < 0.5) {
-            muerto = true;
+    // // Colisiones con los enemigos
+    // enemigos.children.forEach(enemigo => {
+    //     if (robot.position.distanceTo(enemigo.position) < 0.5) {
+    //         muerto = true;
 
-            // Activa la animacion de death
-            fadeToAction('deathAnimation', 0.25);
+    //         // Activa la animacion de death
+    //         fadeToAction('deathAnimation', 0.25);
             
-            // Esperar un segundo y reiniciar el script
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
-        }
-    });
+    //         // Esperar un segundo y reiniciar el script
+    //         setTimeout(() => {
+    //             location.reload();
+    //         }, 2000);
+    //     }
+    // });
 }
 
 function render()
