@@ -444,16 +444,16 @@ function animate()
 
     // Colisiones con los enemigos
     enemigos.children.forEach(enemigo => {
-        if (robot.position.distanceTo(enemigo.position) < 0.6) {
+        if (robot.position.distanceTo(enemigo.position) < 0.6 && !muerto) {
             muerto = true;
 
             // Activa la animacion de death
             fadeToAction('deathAnimation', 0.25);
             
-            // Esperar un segundo y recargar la pagina
+            // Esperar un segundo y medio y recargar la pagina
             setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+                location.reload(true);
+            }, 1500);
         }
     });
 }
