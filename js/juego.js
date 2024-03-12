@@ -353,7 +353,7 @@ function loadScene()
     sunlight.shadow.camera.far = 200;
     scene.add(sunlight);
     // Luz ambiental
-    var ambientLight = new THREE.AmbientLight(0x404040, 3); // Soft white light
+    var ambientLight = new THREE.AmbientLight(0x404040, 2);
     scene.add(ambientLight);
 }
 
