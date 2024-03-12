@@ -5,22 +5,22 @@
 
 // Modulos necesarios
 import * as THREE from "../lib/three.module.js";
-import {OrbitControls} from "../lib/OrbitControls.module.js";
 import {GLTFLoader} from "../lib/GLTFLoader.module.js";
 import {GUI} from "../lib/lil-gui.module.min.js";
 import { TWEEN } from "../lib/tween.module.min.js";
+import * as CANNON from "../lib/cannon-es.module.js";
 
 
 // --VARIABLES GLOBALES--
 // Camara escena y render
-let camera, scene, renderer;
+let camera, scene, renderer, world;
 
 // Variables de movimiento
 let mouseX = 0, mouseY = 0;
 let previousMouseX = 0, previousMouseY = 0;
 
 // Objetos
-let robot, objetos, enemigos, muros;
+let robot, robotBody, objetos, enemigos, muros;
 
 //Teclas
 let keys = {};
@@ -80,13 +80,30 @@ function objectBalance(){
 
 // Metodo de geometria de un tornillo
 function tornillo() {
-    
+    let tornillo = new THREE.Object3D();
+    var geometry = new THREE.CylinderGeometry( 0.02, 0.02, 0.075, 7 );
+    var material = new THREE.MeshBasicMaterial( { color: 0x808080 } );
+    var cylinder = new THREE.Mesh( geometry, material );
+    tornillo.add(cylinder);
+    // Cabeza hemiesferica, alterar el thetaLength para que sea un cuarto de esfera
+    var geometry = new THREE.SphereGeometry( 0.05, 15, 15, 0, Math.PI * 2, 0, Math.PI / 2);
+    var material = new THREE.MeshBasicMaterial( { color: 0x808080 } );
+    var sphere = new THREE.Mesh( geometry, material );
+    sphere.position.y = 0.025;
+    tornillo.add(sphere);
+    // Punta final del tornillo
+    var geometry = new THREE.CylinderGeometry( 0.019, 0.001, 0.035, 7 );
+    var material = new THREE.MeshBasicMaterial( { color: 0x808080 } );
+    var cylinder = new THREE.Mesh( geometry, material );
+    cylinder.position.y = -0.055;
+    tornillo.add(cylinder);
+    return tornillo;
 }
 
 // Metodo de la geometria de una tuerca
 function tuerca() {
     var geometry = new THREE.TorusGeometry( 0.05, 0.0175, 3, 7 );
-    var material = new THREE.MeshLambertMaterial( { color: 0x808080 } );
+    var material = new THREE.MeshBasicMaterial( { color: 0x808080 } );
     var torus = new THREE.Mesh( geometry, material );
     return torus;
 }
@@ -98,6 +115,10 @@ function init()
     renderer = new THREE.WebGLRenderer();
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.getElementById('container').appendChild( renderer.domElement );
+
+    //Sombras
+    renderer.shadowMap.enabled = true; 
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Reloj
     clock = new THREE.Clock();
@@ -115,9 +136,14 @@ function init()
     ]);
     scene.background = fondo;
 
+    // Crear el mundo fisico
+    world = new CANNON.World();
+    world.gravity.set(0,-9.8,0);
+
+
     // Crear la cámara
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0,0,-1);
+    camera.position.set(0,0,0);
 
     // Eventos
     // Ecento de tecla pulsada
@@ -163,28 +189,47 @@ function loadScene()
     const geometriaSuelo = new THREE.BoxGeometry (40,1,40);
     const suelo = new THREE.Mesh( geometriaSuelo, materialSuelo);
     suelo.rotation.y = Math.PI/2
-    suelo.position.y = -0.75
+    suelo.position.y = -0.75;
+    suelo.receiveShadow = true;
     scene.add(suelo);
+
+    // Crear un cuerpo que se adapte al suelo
+    var shape = new CANNON.Box(new CANNON.Vec3(20, 0.5, 20));
+    var body = new CANNON.Body({ mass: 0 });
+    body.addShape(shape);
+    body.position.copy(suelo.position);
+    body.quaternion.copy(suelo.quaternion);
+    world.addBody(body);
 
     // Muros
     // Propiedades de los muros
     let rotation = 0;
     let posiciones = [[0,2,20],[20,2,0],[0,2,-20],[-20,2,0]]
-    var texture = textureLoader.load('images/wall.png');
+    var texture = textureLoader.load('images/wall.jpg');
     const geometriaMuro = new THREE.BoxGeometry(40, 5, 1);
     const materialMuro = new THREE.MeshLambertMaterial({ map: texture });
     // Propiedades de repetición de textura
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(20, 20);
+    texture.repeat.set(8, 4);
     muros = new THREE.Object3D();
     scene.add(muros);
     for(let i=0; i<4; i++){
         const muro = new THREE.Mesh(geometriaMuro, materialMuro);
         muro.position.set(posiciones[i][0],posiciones[i][1],posiciones[i][2])
         muro.rotation.y = rotation
+        muro.receiveShadow = true;
+        muro.castShadow = true;
         muros.add(muro)
         rotation += Math.PI/2
+
+        // Crear un cuerpo que se adapte al muro
+        var shape = new CANNON.Box(new CANNON.Vec3(20, 2.5, 0.75));
+        var body = new CANNON.Body({ mass: 0 });
+        body.addShape(shape);
+        body.position.copy(muro.position);
+        body.quaternion.copy(muro.quaternion);
+        world.addBody(body);
     }
 
     // Personaje principal modelo gltf robot
@@ -193,6 +238,13 @@ function loadScene()
         robot = gltf.scene;
         robot.scale.set(0.05, 0.05, 0.05);
         robot.position.y = -0.25;
+        // Crear un cuerpo con forma de caja
+        robotBody = new CANNON.Body({
+            mass: 1,
+            position: new CANNON.Vec3(0,1,0),
+            shape: new CANNON.Box(new CANNON.Vec3(0.25,0.25,0.25))
+        });
+        world.addBody(robotBody);
 
         // Animaciones
         const animations = gltf.animations;
@@ -212,31 +264,78 @@ function loadScene()
         accionesRobot['deathAnimation'].clampWhenFinished = true;
 
         scene.add(robot);
-
     });
+
+    // Crear arboles con la geometria de un cilindro y una esfera
+
+    // Tronco
+    let geometriaTronco = new THREE.CylinderGeometry( 0.1, 0.1, 0.75, 8 );
+    // Texura wood
+    var texture = textureLoader.load('images/tree.png');
+    let materialTronco = new THREE.MeshLambertMaterial( { map: texture } );
+
+    // Hojas
+    var geometriaHojas = new THREE.SphereGeometry( 0.5, 15, 15 );
+    // Textura leaves
+    var texture = textureLoader.load('images/leaves.jpg');
+    // Tiling properties
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(10, 10);
+    var materialHojas = new THREE.MeshLambertMaterial( { map: texture } );
+
+    for (let i = 0; i < 15; i++) {
+        // Tronco
+        var cylinder = new THREE.Mesh( geometriaTronco, materialTronco );
+        // Hojas
+        var sphere = new THREE.Mesh( geometriaHojas, materialHojas );
+        sphere.position.y = 0.7;
+        // Arbol
+        var arbol = new THREE.Object3D();
+        arbol.add(cylinder);
+        arbol.add(sphere);
+        arbol.position.set(Math.random() * 30 - 15, 0, Math.random() * 30 - 15);
+        scene.add(arbol);
+        // Crear un cuerpo con forma de cilindro
+        var shape = new CANNON.Cylinder(0.1, 0.1, 1, 8);
+        var body = new CANNON.Body({ mass: 0 });
+        body.addShape(shape);
+        body.position.copy(arbol.position);
+        world.addBody(body);
+        // Sombras del arbol
+        cylinder.castShadow = true;
+        sphere.castShadow = true;
+    }
+
 
     // Crear objetos para recolectar
     objetos = new THREE.Object3D();
     scene.add(objetos);
-    for (let i = 0; i < 50; i++) {
-        const objeto = tuerca();
+    for (let i = 0; i < 25; i++) {
+        // Aleatorio entre tornillo y tuerca
+        let objeto;
+        if (Math.random() > 0.5) {
+            objeto = tornillo();
+        } else {
+            objeto = tuerca();
+        }
         objeto.position.set(Math.random() * 30 - 15, -0.1, Math.random() * 30 - 15);
         objetos.add(objeto);
     }
 
     objectBalance();
 
-    // // Añadir 5 enemigos usando el modelo gltf Enemy y animarlos
-    // enemigos = new THREE.Object3D();
-    // scene.add(enemigos);
-    // for (let i = 0; i < 5; i++) {
-    //     loader.load('models/Enemy/Enemy.glb', function (gltf) {
-    //         let enemigo = gltf.scene;
-    //         enemigo.scale.set(0.25, 0.25, 0.25);
-    //         enemigo.position.set(Math.random() * 30 - 15, 0, Math.random() * 30 - 15);
-    //         enemigos.add(enemigo);
-    //     });
-    // }
+    // Añadir 3 enemigos usando el modelo gltf Enemy
+    enemigos = new THREE.Object3D();
+    scene.add(enemigos);
+    for (let i = 0; i < 3; i++) {
+        loader.load('models/Enemy/Enemy.glb', function (gltf) {
+            let enemigo = gltf.scene;
+            enemigo.scale.set(0.25, 0.25, 0.25);
+            enemigo.position.set(Math.random() * 30 - 15, 0.25, Math.random() * 30 - 15);
+            enemigos.add(enemigo);
+        });
+    }
 
     // Creación del sol
     const sol = new THREE.Mesh( new THREE.SphereGeometry(5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
@@ -246,6 +345,11 @@ function loadScene()
     var sunlight = new THREE.SpotLight(0xffffff, 1);
     sunlight.position.set(0, 25, 70);
     sunlight.target = suelo;
+    sunlight.castShadow = true;
+    sunlight.shadow.mapSize.width = 1024;
+    sunlight.shadow.mapSize.height = 1024;
+    sunlight.shadow.camera.near = 10;
+    sunlight.shadow.camera.far = 200;
     scene.add(sunlight);
     // Luz ambiental
     var ambientLight = new THREE.AmbientLight(0x404040, 3); // Soft white light
@@ -266,7 +370,6 @@ function createGUI()
 // Animar la escena
 function animate()
 {
-
     // --ACTUALIZACIONES--
 
     // Actualizar el reloj
@@ -283,12 +386,15 @@ function animate()
     stats.add(puntuacionGUI, 'puntuacion').listen().name('Puntuacion');
     stats.open();
 
+    // Cannon
+    world.step(1/60);
+
     // -- ANIMACIONES Y MOVIMIENTOS --
 
     // Movimiento de la camara en los tres ejes con el raton siguiendo al personaje
     let deltaX = mouseX - previousMouseX;
     let deltaY = mouseY - previousMouseY;
-    robot.rotation.y -= deltaX * 0.01;
+    robot.rotation.y -= deltaX * 0.005;
     camera.position.x = robot.position.x - Math.sin(robot.rotation.y) * 1;
     camera.position.z = robot.position.z - Math.cos(robot.rotation.y) * 1;
     camera.lookAt(robot.position);
@@ -312,46 +418,28 @@ function animate()
     // Movimiento del personaje con las teclas independiente de los fps
     if (keys['w'] && !muerto) {
         // Movimiento del personaje
-        if (robot.position.x >= 19.3) {
-            robot.position.x -= 0.1;
-        } else if (robot.position.x <= -19.3) {
-            robot.position.x += 0.1;
-        } else if (robot.position.z >= 19.3) {
-            robot.position.z -= 0.1;
-        } else if (robot.position.z <= -19.3) {
-            robot.position.z += 0.1;
-        }else{
-            robot.position.x += Math.sin(robot.rotation.y) * speed * UpdateDelta;
-            robot.position.z += Math.cos(robot.rotation.y) * speed * UpdateDelta;
-        }
+        robotBody.position.x += Math.sin(robot.rotation.y) * speed * UpdateDelta;
+        robotBody.position.z += Math.cos(robot.rotation.y) * speed * UpdateDelta;
     } else if (keys['s'] && !muerto) {
         // Movimiento del personaje
-        if (robot.position.x >= 19.3) {
-            robot.position.x -= 0.1;
-        } else if (robot.position.x <= -19.3) {
-            robot.position.x += 0.1;
-        } else if (robot.position.z >= 19.3) {
-            robot.position.z -= 0.1;
-        } else if (robot.position.z <= -19.3) {
-            robot.position.z += 0.1;
-        }else{
-            robot.position.x -= Math.sin(robot.rotation.y) * speed * UpdateDelta;
-            robot.position.z -= Math.cos(robot.rotation.y) * speed * UpdateDelta;
-        }
+        robotBody.position.x -= Math.sin(robot.rotation.y) * speed * UpdateDelta;
+        robotBody.position.z -= Math.cos(robot.rotation.y) * speed * UpdateDelta;
     } else if (!muerto) {
         // Activa la animacion de idle
         fadeToAction('idleAnimation', 0.25);
         speed = 0;
     }
+    robot.position.x = robotBody.position.x;
+    robot.position.z = robotBody.position.z;
 
-    // // Movimiento de los enemigos buscando al personaje
-    // enemigos.children.forEach(enemigo => {
-    //     let direccion = new THREE.Vector3();
-    //     direccion.subVectors(robot.position, enemigo.position).normalize();
-    //     enemigo.lookAt(robot.position);
-    //     enemigo.position.x += direccion.x * 0.5 * UpdateDelta;
-    //     enemigo.position.z += direccion.z * 0.5 * UpdateDelta;
-    // });
+    // Movimiento de los enemigos buscando al personaje
+    enemigos.children.forEach(enemigo => {
+        let direccion = new THREE.Vector3();
+        direccion.subVectors(robot.position, enemigo.position).normalize();
+        enemigo.lookAt(robot.position);
+        enemigo.position.x += direccion.x * 0.5 * UpdateDelta;
+        enemigo.position.z += direccion.z * 0.5 * UpdateDelta;
+    });
 
     // --COLISIONES--
 
@@ -360,24 +448,23 @@ function animate()
         if (robot.position.distanceTo(objeto.position) < 0.5) {
             objetos.remove(objeto);
             puntuacion++;
-            updateGUI();
         }
     });
 
-    // // Colisiones con los enemigos
-    // enemigos.children.forEach(enemigo => {
-    //     if (robot.position.distanceTo(enemigo.position) < 0.5) {
-    //         muerto = true;
+    // Colisiones con los enemigos
+    enemigos.children.forEach(enemigo => {
+        if (robot.position.distanceTo(enemigo.position) < 0.6) {
+            muerto = true;
 
-    //         // Activa la animacion de death
-    //         fadeToAction('deathAnimation', 0.25);
+            // Activa la animacion de death
+            fadeToAction('deathAnimation', 0.25);
             
-    //         // Esperar un segundo y reiniciar el script
-    //         setTimeout(() => {
-    //             location.reload();
-    //         }, 2000);
-    //     }
-    // });
+            // Esperar un segundo y reiniciar el script
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        }
+    });
 }
 
 function render()

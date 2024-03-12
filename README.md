@@ -36,5 +36,8 @@ Pulsar shift alterna entre correr y andar
 
 * grass https://opengameart.org/content/grass-1
 * skybox https://opengameart.org/content/sky-box-sunny-day
+* walls https://opengameart.org/content/wall-of-large-bricks
+* wood https://opengameart.org/content/seamless-tiling-tree-bark-texture
+* leaves https://opengameart.org/content/bush-with-small-round-leaves-seamless-texture-with-normalmap-0
 * Robot model https://poly.pizza/m/QCm7qe9uNJ
 * Enemy model https://poly.pizza/m/lF3jeRJwiH
