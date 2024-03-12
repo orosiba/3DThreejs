@@ -30,7 +30,8 @@ let accionesRobot = {};
 let clock, mixer, accionActiva, accionPrevia;
 
 // Puntuacion y estado
-let puntuacion = 0;
+let gui;
+let puntuacion = { 'puntuacion': 0 };
 let muerto = false;
 
 // --ACCIONES--
@@ -359,12 +360,9 @@ function loadScene()
 // Crea la interfaz de usuario
 function createGUI()
 {
-	// Creacion interfaz
-	const gui = new GUI();
-    // Creacion de estadisticas de puntuacion
-    const stats = gui.addFolder('Estadisticas');
-    stats.add({ puntuacion: 0 }, 'puntuacion').listen().name('Puntuacion');
-    stats.open();
+    // Creacion de la interfaz con la puntuacion
+    gui = new GUI();
+    gui.add(puntuacion, 'puntuacion').name('Puntuacion').listen();
 }
 
 // Animar la escena
@@ -378,14 +376,7 @@ function animate()
     // Actualizar Tween y mixer
     TWEEN.update();
     mixer.update( UpdateDelta );
-
-    // Actualizar interfaz
-    const puntuacionGUI = { puntuacion: puntuacion };
-    const gui = new GUI();
-    const stats = gui.addFolder('Estadisticas');
-    stats.add(puntuacionGUI, 'puntuacion').listen().name('Puntuacion');
-    stats.open();
-
+    
     // Cannon
     world.step(1/60);
 
@@ -447,7 +438,7 @@ function animate()
     objetos.children.forEach(objeto => {
         if (robot.position.distanceTo(objeto.position) < 0.5) {
             objetos.remove(objeto);
-            puntuacion++;
+            puntuacion['puntuacion'] += 1;
         }
     });
 
