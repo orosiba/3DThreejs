@@ -12,15 +12,13 @@ Este proyecto es un diseño sobre un videojuego web usando Three.js para la asig
 
 El terreno: está conformado por un suelo con textura de hierba, cuatro muros con textura de piedra que delimitan el mapa y árboles con textura de tronco y hojas que decoran la escena y que se generan aleatoriamente. Además, se ha usado un skybox del cielo para el fondo.
 
-El robot: Es un modelo gltf que representa un robot y que será el personaje principal que controle el usuario.
+El robot y la camara: El robot es un modelo gltf que representa un robot y que será el personaje principal que controle el usuario. La camara se colocara en todo momento detrás del robot para que el usuario pueda controlarlo.
 
 Los enemigos: Son modelos gltf de robots voladores que debemos evitar.
 
-Tornillos y tuercas: El objetivo es recoger los tornillos y las tuercas que se generan aleatoriamente en el mapa y que aumentarán la puntuación que se ve desde la GUI.
+Tornillos y tuercas: El objetivo es recoger los tornillos y las tuercas que se generan aleatoriamente en el mapa y que aumentarán la puntuación que se ve desde la GUI. El tornillo esta formado por una hemiesfera, un cilindro y un cono y la tuerca por un toroide.
 
 El sol: Es una esfera amarilla que representará el sol y de la cual surgirá la luz.
-
-La camara: La camara se colocara en todo momento detrás del robot para que el usuario pueda controlarlo.
 
 ### Iluminación y sombras
 
@@ -28,13 +26,13 @@ La iluminación estará formada por una luz focal y una ambiental que trabajan j
 
 La luz focal se origina desde un solo punto y se irradia en una dirección específica. En el juego, la luz focal sale desde el sol y apunta hacia el suelo. Esta luz también tiene la capacidad de proyectar sombras en la escena, lo que añade un nivel adicional de realismo. Las sombras se reflejarán sobre el suelo y los muros.
 
-Se irradia en todas las direcciones y afecta a todos los objetos de la escena por igual, independientemente de su posición o dirección. En el juego, se usa la luz ambiental para suavizar las sombras y asegurarte de que las partes de la escena que no están directamente iluminadas por la luz focal aún sean visibles.
+La luz ambiental se irradia en todas las direcciones y afecta a todos los objetos de la escena por igual, independientemente de su posición o dirección. En el juego, se usa la luz ambiental para suavizar las sombras y asegurarte de que las partes de la escena que no están directamente iluminadas por la luz focal aún sean visibles.
 
 ### Animaciones
 
 Se utiliza un objeto THREE.Clock para rastrear el tiempo transcurrido. Esto es útil para animaciones que dependen del tiempo, como mover el robot. Utilizando el método getDelta del reloj se obtiene el tiempo transcurrido desde la última vez que se llamó a getDelta. Esto se almacena en UpdateDelta y se usa para hacer las animaciones dependientes del tiempo y no de la tasa de fotogramas.
 
-Se utiliza la biblioteca TWEEN para crear animaciones suaves. TWEEN permite especificar los valores inicial y final de una propiedad y luego animar suavemente esa propiedad a lo largo del tiempo. Se utiliza para proporcionar balanceo y rotación a los tornillos y las tuercas y que el usuario perciba que es un objeto que se puede recojer. Se actualizan todas las animaciones de TWEEN con TWEEN.update().
+Se utiliza la biblioteca TWEEN para crear animaciones suaves. Se utiliza para proporcionar balanceo y rotación a los tornillos y las tuercas y que el usuario perciba que es un objeto que se puede recojer. Se actualizan todas las animaciones de TWEEN con TWEEN.update().
 
 Mixer se utiliza para reproducir animaciones. Un AnimationMixer puede controlar varias animaciones a la vez y permite cosas como mezclar animaciones, pausarlas, detenerlas, etc. En el código, se esta utilizando para las animaciones de quedarse quieto, andar, correr y morirse del robot y se actualiza el mixer con mixer.update(UpdateDelta).
 

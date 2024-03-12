@@ -225,7 +225,7 @@ function loadScene()
         rotation += Math.PI/2
 
         // Crear un cuerpo que se adapte al muro
-        var shape = new CANNON.Box(new CANNON.Vec3(20, 2.5, 0.75));
+        var shape = new CANNON.Box(new CANNON.Vec3(20, 2.5, 0.5));
         var body = new CANNON.Body({ mass: 0 });
         body.addShape(shape);
         body.position.copy(muro.position);
@@ -243,7 +243,7 @@ function loadScene()
         robotBody = new CANNON.Body({
             mass: 1,
             position: new CANNON.Vec3(0,1,0),
-            shape: new CANNON.Box(new CANNON.Vec3(0.25,0.25,0.25))
+            shape: new CANNON.Box(new CANNON.Vec3(0.2,0.2,0.2))
         });
         world.addBody(robotBody);
 
@@ -450,10 +450,10 @@ function animate()
             // Activa la animacion de death
             fadeToAction('deathAnimation', 0.25);
             
-            // Esperar un segundo y reiniciar el script
+            // Esperar un segundo y recargar la pagina
             setTimeout(() => {
-                location.reload();
-            }, 2000);
+                window.location.reload();
+            }, 1000);
         }
     });
 }
